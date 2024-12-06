@@ -19,3 +19,4 @@ class Hello:
             message="Hello, World!",
             data={"message": "Hello, World!"},
         )
+

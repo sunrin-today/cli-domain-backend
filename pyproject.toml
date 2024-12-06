@@ -13,6 +13,9 @@ sentry-sdk = {extras = ["fastapi"], version = "^2.19.0"}
 uvicorn = "^0.32.1"
 fastapi-restful = "^0.6.0"
 typing-inspect = "^0.9.0"
+aiogoogle = "^5.13.2"
+dependency-injector = "^4.43.0"
+tortoise-orm = {extras = ["asyncpg"], version = "^0.22.1"}
 
 
 [tool.poetry.group.dev.dependencies]

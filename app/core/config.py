@@ -29,14 +29,16 @@ class Settings(BaseSettings):
     SERVER_PORT: int
     SENTRY_DSN: str | None = None
 
+    GOOGLE_CLIENT_ID: str
+    GOOGLE_CLIENT_SECRET: str
+    GOOGLE_REDIRECT_URI: str
+
     @staticmethod
     @field_validator("SERVER_PORT")
     def check_port_range(value: int):
         if not 0 < value < 65536:
             raise ValueError("SERVER_PORT number must be between 1 and 65535")
         return value
-
-    PROJECT_NAME: str
 
 
 settings = Settings()
