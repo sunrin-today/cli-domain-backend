@@ -1,6 +1,4 @@
-# fastapi-poetry-template
-좌호빈 화이팅  
-간단하게 FastAPI와 Poetry + Sentry을 사용하는 템플릿입니다.
+# CLI Domain Backend
 
 ## 야미
 FastAPI X Poetry와 함께 쓰세요.   
