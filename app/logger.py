@@ -12,7 +12,7 @@ log_format = (
 def use_logger(name):
     logger = logging.getLogger(name)
 
-    if settings.ENVIRONMENT == "local":
+    if settings.ENVIRONMENT == "production" or settings.ENVIRONMENT == "staging":
         logger.setLevel(logging.INFO)
 
         log_dir = "logs"
@@ -36,11 +36,11 @@ def use_logger(name):
         logger.addHandler(file_handler)
         logger.addHandler(console_handler)
 
-    elif settings.ENVIRONMENT == "production" or settings.ENVIRONMENT == "staging":
-        logger.setLevel(logging.ERROR)
+    elif settings.ENVIRONMENT == "local":
+        logger.setLevel(logging.DEBUG)
 
         console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.ERROR)
+        console_handler.setLevel(logging.DEBUG)
 
         formatter = logging.Formatter(log_format)
         console_handler.setFormatter(formatter)
