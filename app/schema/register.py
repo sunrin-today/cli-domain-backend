@@ -1,10 +1,12 @@
 from enum import IntEnum, StrEnum
-from pydantic import constr, Field
+from typing import Union, Annotated
+
+from pydantic import Field, conint, BeforeValidator
 from ipaddress import IPv4Address, IPv6Address
 
-from app.core.pydantic_model import BaseSchema
+from pydantic.v1.class_validators import Validator
 
-DOMAIN_NAME_REGEX = constr(pattern=r"^((?!-)[A-Za-z0-9-]{1,63}(?<!-)\.)+[A-Za-z]{2,6}$")
+from app.core.pydantic_model import BaseSchema
 
 
 class CAATag(StrEnum):
@@ -34,7 +36,7 @@ class RecordCAAValueDTO(BaseSchema):
 
 
 class RecordCNAMEValueDTO(BaseSchema):
-    target: DOMAIN_NAME_REGEX
+    target: str
 
 
 class RecordDSValueDTO(BaseSchema):
@@ -45,12 +47,12 @@ class RecordDSValueDTO(BaseSchema):
 
 
 class RecordMXValueDTO(BaseSchema):
-    mailserver: DOMAIN_NAME_REGEX
+    mailserver: str
     priority: int = Field(..., le=65535, ge=0)
 
 
 class RecordNSValueDTO(BaseSchema):
-    nameserver: DOMAIN_NAME_REGEX
+    nameserver: str
 
 
 class RecordSRVValueDTO(BaseSchema):
@@ -68,3 +70,30 @@ class RecordURIValueDTO(BaseSchema):
     priority: int = Field(..., le=65535, ge=0)
     weight: int = Field(..., le=65535, ge=0)
     target: str
+
+
+RecordValueType = Union[
+    RecordAValueDTO,
+    RecordAAAAValueDTO,
+    RecordCAAValueDTO,
+    RecordCNAMEValueDTO,
+    RecordDSValueDTO,
+    RecordMXValueDTO,
+    RecordNSValueDTO,
+    RecordSRVValueDTO,
+    RecordTXTValueDTO,
+    RecordURIValueDTO,
+]
+
+
+def validate_ttl(v: int) -> int:
+    if v != 1 and (v < 60 or v > 86400):
+        raise ValueError("TTL must be 1 or between 60 and 86400")
+    return v
+
+
+class RegisterDomainDTO(BaseSchema):
+    name: str
+    value: RecordValueType
+    ttl: Annotated[int, BeforeValidator(validate_ttl)]
+    proxied: bool = False
