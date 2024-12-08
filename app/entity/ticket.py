@@ -2,6 +2,8 @@ from enum import StrEnum, auto
 
 from tortoise import Model, fields
 
+from app.entity.user import User
+
 
 class DomainRecordType(StrEnum):
     A = auto()
@@ -31,11 +33,12 @@ class DomainTTLType(StrEnum):
     ONE_DAY = "1 day"
 
 
-class Domain(Model):
+class DomainTicket(Model):
     id = fields.UUIDField(pk=True)
     name = fields.CharField(max_length=50)
     value = fields.JSONField()
     proxied = fields.BooleanField(default=False)
-    ttl = fields.CharField(max_length=10, default=DomainTTLType.AUTO)
-    requested_data = fields.JSONField()
+    ttl = fields.CharField(max_length=10, default=DomainTTLType.AUTO.value)
     pending = fields.BooleanField(default=False)
+
+    user: fields.ForeignKeyRelation["User"]
