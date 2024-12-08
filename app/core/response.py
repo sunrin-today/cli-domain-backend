@@ -6,6 +6,7 @@ from pydantic import Field, BaseModel
 
 from app.core.error import ErrorCode
 from app.core.pydantic_model import BaseSchema
+from app.core.string import generate_error_ticket_id
 
 T = TypeVar("T")
 
@@ -26,6 +27,7 @@ class ErrorResponse(BaseSchema):
         default_factory=functools.partial(dict, {}),
         examples=[{"user_id": "673c114c-e920-4b6c-bc16-f5666c8d1e60"}],
     )
+    trace_id: str = Field(..., examples=["a1b2c3d4e5f6g7h8i9j0"])
 
 
 class APIError(HTTPException):
@@ -39,8 +41,13 @@ class APIError(HTTPException):
     ):
         if error_data is None:
             error_data = {}
+
+        self.error_code = error_code
         self.error_response = ErrorResponse(
-            error_code=error_code.value, message=message, error_data=error_data
+            error_code=error_code.value,
+            message=message,
+            error_data=error_data,
+            trace_id=generate_error_ticket_id(),
         )
 
         super().__init__(
