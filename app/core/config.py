@@ -1,13 +1,14 @@
 import secrets
-from typing import Literal, Any
+from typing import Literal, Any, Annotated
 from pydantic import (
     field_validator,
+    BeforeValidator,
 )
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-def parse_cors(v: Any) -> list[str] | str:
+def parse_string_list(v: Any) -> list[str] | str:
     if isinstance(v, str) and not v.startswith("["):
         return [i.strip() for i in v.split(",")]
     elif isinstance(v, list | str):
@@ -32,6 +33,16 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str
     GOOGLE_CLIENT_SECRET: str
     GOOGLE_REDIRECT_URI: str
+
+    DATABASE_URI: str
+    REDIS_URI: str
+
+    CLOUDFLARE_API_TOKEN: str
+    DISCORD_PUBLIC_KEY: str
+    DISCORD_BOT_TOKEN: str
+
+
+
 
     @staticmethod
     @field_validator("SERVER_PORT")
