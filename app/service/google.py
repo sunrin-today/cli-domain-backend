@@ -6,7 +6,7 @@ from app.logger import use_logger
 
 from aiogoogle import Aiogoogle, auth as aiogoogle_auth
 
-logger = use_logger("google-service")
+_log = use_logger("google-service")
 
 
 class GoogleScope:
@@ -30,7 +30,6 @@ class GoogleRequestService:
         self._google_client = Aiogoogle(
             client_creds=self.__google_credentials,
         )
-        self._request = ClientSession()
 
     async def get_authorization_url(self, state: str) -> str:
         return self._google_client.oauth2.authorization_url(
