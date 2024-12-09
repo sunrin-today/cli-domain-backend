@@ -32,7 +32,7 @@ def modify_cloudflare_error_name(event, hint):
     return event
 
 
-if settings.SENTRY_DSN and True:
+if settings.SENTRY_DSN and settings.ENVIRONMENT == "production":
     sentry_sdk.init(
         dsn=str(settings.SENTRY_DSN),
         enable_tracing=True,

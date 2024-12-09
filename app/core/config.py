@@ -40,9 +40,8 @@ class Settings(BaseSettings):
     CLOUDFLARE_API_TOKEN: str
     DISCORD_PUBLIC_KEY: str
     DISCORD_BOT_TOKEN: str
-
-
-
+    DISCORD_VERIFY_CHANNEL_ID: str
+    DISCORD_VERIFY_ROLE_ID: str
 
     @staticmethod
     @field_validator("SERVER_PORT")

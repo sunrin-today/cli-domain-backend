@@ -16,7 +16,7 @@ _login_log = use_logger("login-session-service")
 
 class LoginSessionService:
     KEY = "LOGIN_SESSION"
-    EXPIRATION = timedelta(minutes=10)
+    EXPIRATION = timedelta(minutes=5)
 
     def __init__(self, websocket: ConnectionManager) -> None:
         self.redis = manager.get_connection()
@@ -87,3 +87,6 @@ class UserSessionService:
 
     async def exist_token(self, token: str) -> bool:
         return await self.redis.exists(f"{self.KEY}:{token}")
+
+    async def delete_token(self, token: str) -> None:
+        await self.redis.delete(f"{self.KEY}:{token}")

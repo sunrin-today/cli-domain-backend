@@ -4,6 +4,12 @@ from typing import Any
 from pydantic import BaseModel
 
 
+class InteractionType(IntEnum):
+    PING = 1
+    APPLICATION_COMMAND = 2
+    MESSAGE_COMPONENT = 3
+
+
 class InteractionCallbackType(IntEnum):
     # 서버의 핑 요청에 대한 응답
     PONG = 1
@@ -84,12 +90,11 @@ class ButtonStyle(IntEnum):
     # 링크 스타일
     LINK = 5
 
-def create_response(content: str, ephemeral: bool = False):
+
+def create_interaction_response(content: str, ephemeral: bool = False):
     response = {
         "type": InteractionCallbackType.CHANNEL_MESSAGE,
-        "data": {
-            "content": content
-        }
+        "data": {"content": content},
     }
 
     if ephemeral:
@@ -101,12 +106,9 @@ def create_response(content: str, ephemeral: bool = False):
 def create_modal(custom_id: str, title: str):
     return {
         "type": InteractionCallbackType.MODAL,
-        "data": {
-            "custom_id": custom_id,
-            "title": title,
-            "components": []
-        }
+        "data": {"custom_id": custom_id, "title": title, "components": []},
     }
+
 
 class InteractionResponse(BaseModel):
     type: InteractionCallbackType

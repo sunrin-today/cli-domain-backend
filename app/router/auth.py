@@ -166,6 +166,17 @@ class AuthController:
             message="User information",
         )
 
+    @router.post("/logout")
+    async def logout(
+        self,
+        user: User = Depends(get_current_user_entity),
+        user_session: UserSessionService = Depends(
+            Provide[ServiceContainer.user_session]
+        ),
+    ) -> APIResponse[dict]:
+        await user_session.delete_token(str(user.id))
+        return APIResponse(message="Logout success")
+
 
 @router.websocket("/subscribe")
 @inject

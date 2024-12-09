@@ -12,7 +12,7 @@ router = APIRouter(
 
 @router.get("/")
 def root():
-    return {"message": f"Hello, {settings.PROJECT_NAME}"}
+    return {"message": f"Hello, Sunrin Today"}
 
 
 router.include_router(auth_router)
