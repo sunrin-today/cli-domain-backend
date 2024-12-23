@@ -10,18 +10,14 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from app.core.deps import get_current_user_entity, get_user_token
-from app.core.string import get_main_domain
+from app.core.string import get_main_domain, build_domain_record_view
 from app.entity import User
 from app.core.error import ErrorCode
 from app.core.response import APIResponse, APIError
-from app.schema.register import (
-    RecordValueType,
-    RecordAAAAValueDTO,
-    RecordAValueDTO,
-    RegisterDomainDTO,
-)
+from app.schema.register import RecordDTO
 from app.service.cloudflare import CloudflareRequestService
 from app.service.container import ServiceContainer
+from app.service.discord_interaction import DiscordRequester
 from app.service.domain import DomainService
 from app.service.google import GoogleRequestService
 from app.service.localdb import LocalDBService
@@ -39,6 +35,31 @@ limiter = Limiter(
     storage_uri=settings.REDIS_URI,
 )
 _log = use_logger("domain-controller")
+
+
+def register_domain_filter(domain_name: str):
+    parts = domain_name.split(".")
+    if len(parts) <= 2:
+        raise APIError(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            error_code=ErrorCode.DOMAIN_NOT_ALLOWED,
+            message="Invalid domain name",
+        )
+    subdomain = ".".join(parts[:-2])
+    subdomain_parts = subdomain.split(".")
+    if len(subdomain_parts) > 1:
+        raise APIError(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            error_code=ErrorCode.DOMAIN_NOT_ALLOWED,
+            message="Not allowed this subdomain",
+        )
+    if "*" in subdomain:
+        raise APIError(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            error_code=ErrorCode.DOMAIN_NOT_ALLOWED,
+            message="Not allowed wildcard domain",
+        )
+    return True
 
 
 @cbv(router)
@@ -98,13 +119,16 @@ class DomainController:
         self,
         request: Request,
         user: User = Depends(get_current_user_entity),
-        data: RegisterDomainDTO = Body(...),
+        data: RecordDTO = Body(...),
         localdb_service: LocalDBService = Depends(Provide[ServiceContainer.localdb]),
         cloudflare_service: CloudflareRequestService = Depends(
             Provide[ServiceContainer.cloudflare]
         ),
         domain_service: DomainService = Depends(Provide[ServiceContainer.domain]),
+        discord_service: DiscordRequester = Depends(Provide[ServiceContainer.discord]),
     ) -> APIResponse[dict]:
+        if register_domain_filter(data.name):
+            print("1")
         main_domain = get_main_domain(data.name)
         available_domains = await localdb_service.available_domains()
         if not main_domain in available_domains:
@@ -123,15 +147,49 @@ class DomainController:
                 message=f"{data.name}은 사용할 수 없습니다.",
             )
 
-        is_available_ticket = await domain_service.is_exist_ticket(domain=data.name)
-        if is_available_ticket:
+        is_available_ticket = await domain_service.ticket_create_available(user)
+        if not is_available_ticket:
             raise APIError(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                error_code=ErrorCode.DOMAIN_ALREADY_EXIST,
-                message=f"{data.name}은 이미 등록된 도메인입니다.",
+                error_code=ErrorCode.DOMAIN_NOT_ALLOWED,
+                message="최대 도메인 신청 한도에 도달했습니다.",
             )
 
-        # register domain process
+        is_exist_ticket = await domain_service.is_exist_ticket(data.name, user)
+        if is_exist_ticket:
+            raise APIError(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                error_code=ErrorCode.DOMAIN_NOT_ALLOWED,
+                message="이미 신청한 도메인입니다.",
+            )
+
+        ticket = await domain_service.create_ticket(
+            record_data=data,
+            user=user,
+        )
+        domain_record_view = build_domain_record_view(
+            record_data=data,
+        )
+        await discord_service.send_ticket_message(
+            domain_name=data.name,
+            user=user,
+            record_value=domain_record_view,
+            ticket_id=str(ticket.id),
+        )
+        return APIResponse(
+            data={
+                "ticket": {
+                    "id": ticket.id,
+                    "name": ticket.name,
+                    "content": ticket.content,
+                    "data": ticket.data,
+                    "proxied": ticket.proxied,
+                    "ttl": ticket.ttl,
+                    "createdAt": ticket.created_at,
+                }
+            },
+            message="도메인 신청이 완료되었습니다.",
+        )
 
     @router.get("/")
     @inject
@@ -142,17 +200,14 @@ class DomainController:
         return APIResponse(
             data={
                 "domains": [
-                    [
-                        {
-                            "id": domain.id,
-                            "name": domain.name,
-                            "createdAt": domain.created_at,
-                            "updatedAt": domain.updated_at,
-                        }
-                        for domain in user.domains
-                    ]
+                    {
+                        "id": domain.id,
+                        "name": domain.name,
+                        "createdAt": domain.created_at,
+                        "updatedAt": domain.updated_at,
+                    }
                     for domain in user.domains
                 ]
             },
-            message="Domain list",
+            message="도메인 목록 조회가 완료되었습니다.",
         )

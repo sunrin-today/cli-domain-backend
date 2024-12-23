@@ -79,6 +79,7 @@ class AuthController:
                 id=uuid.uuid4(),
                 nickname=user_data["name"],
                 email=user_data["email"],
+                avatar=user_data["picture"],
             )
         else:
             user_entity = await User.filter(email=user_data["email"]).first()

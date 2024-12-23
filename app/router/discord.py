@@ -16,7 +16,7 @@ from app.schema.discord import (
 )
 from app.logger import use_logger
 from app.core.redis import settings
-from app.service.discord import check_discord_role
+from app.service.discord_old import check_discord_role
 
 router = APIRouter(
     prefix="/discord",
