@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     DISCORD_VERIFY_CHANNEL_ID: str
     DISCORD_VERIFY_ROLE_ID: str
 
+    USER_DOMAIN_MAXIMUM: int
+
     @staticmethod
     @field_validator("SERVER_PORT")
     def check_port_range(value: int):
