@@ -2,6 +2,7 @@ from enum import Enum
 
 
 class ErrorCode(str, Enum):
+    DOMAIN_ALREADY_EXIST = "DOMAIN_ALREADY_EXIST"
     INTERNAL_SERVER_ERROR = "INTERNAL_SERVER_ERROR"
     DNS_SERVER_ERROR = "DNS_SERVER_ERROR"
 
