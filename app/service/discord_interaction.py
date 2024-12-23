@@ -3,18 +3,33 @@ from typing import ClassVar, Any
 
 from aiohttp import ClientSession
 from sentry_sdk import capture_exception
+from discord.embeds import Embed
 
 from app.core.config import settings
 from app.core.error import ErrorCode
 from app.core.response import APIError
 from app.logger import use_logger
 
+from app.entity import User as UserEntity
+
 _http_log = use_logger("aiohttp-request")
 _discord_log = use_logger("discord-request-service")
 
 
-def check_discord_role(roles: list[str], specific_role_id: int) -> bool:
-    return any(role_id == str(specific_role_id) for role_id in roles)
+
+def create_ticket_message(domain_name: str, user: UserEntity, value: dict) -> dict:
+    value_string = "\n".join(f"{key}: {value}" for key, value in value.items())
+    return {
+        "embeds": [
+            {
+                "title": f"{domain_name} 도메인 등록 요청",
+                "description": f"```yaml\n{value_string}\n```",
+                "author": {"name": f"{user.nickname} ({user.email})", "icon_url": user.avatar},
+                "timestamp": "2024-12-20T05:26:00.000Z",
+            }
+        ],
+        "attachments": [],
+    }
 
 
 INTERNAL_API_VERSION: int = 10
@@ -71,3 +86,6 @@ class DiscordRequester:
     async def response_interaction(
         self, interaction_id: str, token: str, data: dict
     ) -> None: ...
+
+    async def send_ticket_message(self, channel_id: str, data: dict) -> None:
+        await self.request("POST", f"/channels/{channel_id}/messages", json=data)
