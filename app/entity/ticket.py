@@ -36,9 +36,11 @@ class DomainTTLType(StrEnum):
 class DomainTicket(Model):
     id = fields.UUIDField(pk=True)
     name = fields.CharField(max_length=50)
-    value = fields.JSONField()
+    content = fields.CharField(max_length=255, null=True)
+    record_type = fields.CharField(max_length=10)
+    data = fields.JSONField(null=True)
     proxied = fields.BooleanField(default=False)
     ttl = fields.CharField(max_length=10, default=DomainTTLType.AUTO.value)
-    pending = fields.BooleanField(default=False)
+    created_at = fields.DatetimeField(auto_now_add=True)
 
     user: fields.ForeignKeyRelation["User"]
