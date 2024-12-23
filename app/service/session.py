@@ -1,6 +1,4 @@
-import json
 import uuid
-from calendar import month
 from datetime import timedelta
 
 from fastapi import status
@@ -36,7 +34,8 @@ class LoginSessionService:
         await self.redis.hset(f"{self.KEY}:{session_id}", "user_id", user_id)
 
     async def get_session_user_id(self, session_id: str) -> str:
-        return await self.redis.hget(f"{self.KEY}:{session_id}", "user_id")
+        bytes_value = await self.redis.hget(f"{self.KEY}:{session_id}", "user_id")
+        return bytes_value.decode("utf-8")
 
     async def exist_session(self, session_id: str) -> bool:
         return await self.redis.exists(f"{self.KEY}:{session_id}")
@@ -82,8 +81,8 @@ class UserSessionService:
         await self.redis.expire(f"{self.KEY}:{token}", self.EXPIRATION)
 
     async def get_user_id(self, token: str) -> str:
-        raw_string = await self.redis.get(f"{self.KEY}:{token}")
-        return raw_string.decode("utf-8")
+        bytes_value = await self.redis.get(f"{self.KEY}:{token}")
+        return bytes_value.decode("utf-8")
 
     async def exist_token(self, token: str) -> bool:
         return await self.redis.exists(f"{self.KEY}:{token}")
