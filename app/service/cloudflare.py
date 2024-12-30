@@ -84,3 +84,24 @@ class CloudflareRequestService:
     ) -> bool:
         records = await self.fetch_record(zone_id)
         return domain not in [record["name"] for record in records["result"]]
+
+    async def create_record(
+        self,
+        zone_id: str,
+        data: dict,
+        entity_id: str,
+    ) -> dict:
+        data.update(
+            {
+                "comment": f"Domain ID: {entity_id}",
+            }
+        )
+        return await self.request("POST", f"/zones/{zone_id}/dns_records", json=data)
+
+    async def update_record(self, zone_id: str, record_id: str, data: dict) -> dict:
+        return await self.request(
+            "PATCH", f"/zones/{zone_id}/dns_records/{record_id}", json=data
+        )
+
+    async def delete_record(self, zone_id: str, record_id: str) -> dict:
+        return await self.request("DELETE", f"/zones/{zone_id}/dns_records/{record_id}")
