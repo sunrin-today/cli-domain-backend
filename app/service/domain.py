@@ -1,11 +1,17 @@
-from pyasn1_modules.rfc7906 import Register
+from functools import lru_cache
 
-from app.entity import DomainTicket
+from dependency_injector.wiring import inject, Provide
+from fastapi import status
+
+from app.core.error import ErrorCode
+from app.core.response import APIError
 from app.entity.user import User as UserEntity
-from app.entity.ticket import DomainTicket as DomainTicketEntity, DomainRecordType
+from app.entity.ticket import DomainTicket as DomainTicketEntity, DomainTicketStatus
+from app.entity.domain import Domain as DomainEntity
 
 from app.core.config import settings
 from app.schema.register import RecordDTO
+from app.service.discord_interaction import DiscordRequester
 
 
 class DomainService:
