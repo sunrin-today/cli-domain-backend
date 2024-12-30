@@ -1,6 +1,3 @@
-import os
-
-from aiohttp import ClientSession
 from app.core.config import settings
 from app.logger import use_logger
 

@@ -1,10 +1,8 @@
-from enum import IntEnum, StrEnum, auto
+from enum import IntEnum
 from typing import Annotated, Literal, Union
 
 from pydantic import Field, constr, BeforeValidator, StringConstraints, AnyHttpUrl
 from ipaddress import IPv4Address, IPv6Address
-
-from pydantic.v1.class_validators import Validator
 
 from app.core.pydantic_model import BaseSchema
 
