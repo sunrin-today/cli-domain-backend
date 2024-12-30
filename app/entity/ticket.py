@@ -1,4 +1,4 @@
-from enum import StrEnum, auto
+from enum import StrEnum, auto, IntEnum
 
 from tortoise import Model, fields
 
@@ -33,6 +33,12 @@ class DomainTTLType(StrEnum):
     ONE_DAY = "1 day"
 
 
+class DomainTicketStatus(IntEnum):
+    PENDING = auto()
+    APPROVED = auto()
+    REJECTED = auto()
+
+
 class DomainTicket(Model):
     id = fields.UUIDField(pk=True)
     name = fields.CharField(max_length=50)
@@ -42,5 +48,6 @@ class DomainTicket(Model):
     proxied = fields.BooleanField(default=False)
     ttl = fields.CharField(max_length=10, default=DomainTTLType.AUTO.value)
     created_at = fields.DatetimeField(auto_now_add=True)
+    status = fields.IntEnumField(DomainTicketStatus, default=DomainTicketStatus.PENDING)
 
-    user: fields.ForeignKeyRelation["User"]
+    user: fields.ManyToManyRelation["User"]
