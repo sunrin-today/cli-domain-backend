@@ -14,8 +14,10 @@ class DomainService:
     async def ticket_create_available(user: UserEntity | str) -> int:
         if isinstance(user, str):
             user: UserEntity = await UserEntity.get(id=user)
-        await user.fetch_related("tickets", "domains")
-        ticket_count = len(user.tickets)
+        await user.fetch_related("domains")
+        ticket_count = await DomainTicketEntity.filter(
+            user=user.id, status=DomainTicketStatus.PENDING
+        ).count()
         domain_count = len(user.domains)
         if ticket_count + domain_count >= settings.USER_DOMAIN_MAXIMUM:
             return False
