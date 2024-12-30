@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 import sentry_sdk
-from dependency_injector.wiring import inject, Provide
+from dependency_injector.wiring import inject
 from fastapi import FastAPI
 from tortoise import generate_config, Tortoise
 from tortoise.contrib.fastapi import RegisterTortoise
@@ -46,7 +46,6 @@ def bootstrap() -> FastAPI:
     @inject
     async def lifespan(
         application: FastAPI,
-        cloudflare: ServiceContainer.cloudflare = Provide[ServiceContainer.cloudflare],
     ) -> AsyncGenerator[None, None]:
         _log.info("Starting application")
         tortoise_config = generate_config(
@@ -67,6 +66,7 @@ def bootstrap() -> FastAPI:
                 "app.router",
                 "app.router.auth",
                 "app.router.domain",
+                "app.router.discord",
             ]
         )
         _log.info("Container Wiring complete")
