@@ -35,9 +35,11 @@ class DomainService:
             if isinstance(user_only, str):
                 user_only: UserEntity = await UserEntity.get(id=user_only)
 
-            return await DomainTicket.filter(users=user_only.id, name=domain).exists()
+            return await DomainTicketEntity.filter(
+                user=user_only.id, name=domain
+            ).exists()
 
-        return await DomainTicket.exists(name=domain)
+        return await DomainTicketEntity.exists(name=domain)
 
     @staticmethod
     async def create_ticket(
@@ -46,7 +48,7 @@ class DomainService:
         if isinstance(user, str):
             user: UserEntity = await UserEntity.get(id=user)
 
-        ticket = await DomainTicket.create(
+        ticket = await DomainTicketEntity.create(
             name=record_data.name,
             content=record_data.content,
             record_type=record_data.type,
