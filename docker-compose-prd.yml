@@ -1,0 +1,38 @@
+services:
+  api:
+    container_name: sunrin-domain-api
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8074:80"
+    volumes:
+      - /app
+    depends_on:
+      - database
+
+  redis:
+    image: redis:bookworm
+    container_name: sunrin-domain-redis
+    ports:
+      - 6379:6379
+    environment:
+      - REDIS_PASSWORD=requirepass
+    volumes:
+      - redis:/data
+
+  database:
+    image: postgres:alpine
+    container_name: sunrin-domain-database
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=postgres
+    volumes:
+      - database:/var/lib/postgresql/data
+
+volumes:
+  database:
+  redis:
