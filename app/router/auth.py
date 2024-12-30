@@ -14,8 +14,10 @@ from app.entity import User
 from app.core.error import ErrorCode
 from app.core.response import APIResponse, APIError
 from app.service.container import ServiceContainer
+from app.service.email import EmailRequesterService
 from app.service.google import GoogleRequestService
 from app.service.session import LoginSessionService, UserSessionService
+from app.service.discord_interaction import DiscordRequester
 from app.logger import use_logger
 from app.core.redis import settings
 
@@ -61,6 +63,8 @@ class AuthController:
         user_session: UserSessionService = Depends(
             Provide[ServiceContainer.user_session]
         ),
+        discord_service: DiscordRequester = Depends(Provide[ServiceContainer.discord]),
+        email_service: EmailRequesterService = Depends(Provide[ServiceContainer.email]),
     ) -> HTMLResponse:
         try:
             credentials = await google_service.fetch_user_credentials(code)
@@ -81,6 +85,15 @@ class AuthController:
                 email=user_data["email"],
                 avatar=user_data["picture"],
             )
+            await discord_service.create_log_user_create(
+                email=user_data["email"],
+                name=user_data["name"],
+                avatar=user_data["picture"],
+            )
+            await email_service.send_welcome_email(
+                to_email=user_data["email"],
+                name=user_data["name"],
+            )
         else:
             user_entity = await User.filter(email=user_data["email"]).first()
 
@@ -94,6 +107,7 @@ class AuthController:
         await login_service.set_session_user(
             session_id=session_id, user_id=str(user_entity.id)
         )
+        await discord_service.create_log_refresh_session(user=user_entity)
         if login_service.exist_subscriber(session_id):
             new_access_token = await user_session.create_new_token(str(user_entity.id))
             await login_service.push_token_to_session(session_id, new_access_token)
