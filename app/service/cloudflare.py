@@ -1,7 +1,6 @@
 import contextlib
 from typing import ClassVar, Any
 
-import sentry_sdk
 from aiohttp import ClientSession
 
 from app.core.config import settings
@@ -36,7 +35,7 @@ class CloudflareRequestService:
         )
 
     async def request(self, method: str, path: str, **kwargs):
-        url = f"{self.API}/{path}"
+        url = f"{self.API}{path}"
         async with self._session.request(method, url, **kwargs) as response:
             _http_log.debug(
                 "%s %s with %s has returned %s",
@@ -57,7 +56,7 @@ class CloudflareRequestService:
                 message="DNS 서버에서 요청을 처리할 수 없습니다. 잠시 후 다시 시도해주세요.",
             )
             capture_exception(error)
-            _cf_log.info(f"Error: {error}")
+            _cf_log.info(f"Error: {data}")
             raise error
 
     async def available_zones(self):
