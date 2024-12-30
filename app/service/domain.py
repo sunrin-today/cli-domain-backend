@@ -58,3 +58,86 @@ class DomainService:
         )
         await user.tickets.add(ticket)
         return ticket
+
+    @staticmethod
+    async def approved_ticket(
+        ticket_id: str,
+    ) -> tuple[DomainTicketEntity, DomainEntity]:
+        ticket = await DomainTicketEntity.get(id=ticket_id)
+        new_domain_entity = await DomainEntity.create(
+            name=ticket.name,
+            content=ticket.content,
+            record_type=ticket.record_type,
+            data=ticket.data,
+            proxied=ticket.proxied,
+            ttl=ticket.ttl,
+        )
+        ticket.status = DomainTicketStatus.APPROVED
+        await ticket.save()
+        return ticket, new_domain_entity
+
+    @staticmethod
+    async def reject_ticket(
+        ticket_id: str,
+    ) -> DomainTicketEntity:
+        ticket = await DomainTicketEntity.get(id=ticket_id)
+        ticket.status = DomainTicketStatus.REJECTED
+        await ticket.save()
+        return ticket
+
+    @staticmethod
+    async def get_domain(user: UserEntity, domain_name: str) -> DomainEntity | None:
+        return await DomainEntity.filter(user=user.id, name=domain_name).first()
+
+    @staticmethod
+    async def update_domain_entity(
+        domain: DomainEntity, record_data: RecordDTO
+    ) -> DomainEntity:
+        domain.content = record_data.content
+        domain.record_type = record_data.type
+        domain.data = record_data.data
+        domain.proxied = record_data.proxied
+        domain.ttl = record_data.ttl
+        await domain.save()
+        return domain
+
+    @staticmethod
+    async def get_ticket(
+        ticket_id: str, /, user_only: UserEntity | None = None
+    ) -> DomainTicketEntity:
+        if user_only:
+            ticket_entity = await DomainTicketEntity.get_or_none(
+                id=ticket_id, user=user_only.id
+            )
+        else:
+            ticket_entity = await DomainTicketEntity.get_or_none(id=ticket_id)
+        if not ticket_entity:
+            raise APIError(
+                status_code=status.HTTP_404_NOT_FOUND,
+                error_code=ErrorCode.TICKET_NOT_FOUND,
+                message="티켓을 찾을 수 없습니다.",
+            )
+        return ticket_entity
+
+    @staticmethod
+    @lru_cache(maxsize=500)
+    async def get_status() -> dict:
+        return {
+            "ticket": {
+                "pending": await DomainTicketEntity.filter(
+                    status=DomainTicketStatus.PENDING
+                ).count(),
+                "approved": await DomainTicketEntity.filter(
+                    status=DomainTicketStatus.APPROVED
+                ).count(),
+                "rejected": await DomainTicketEntity.filter(
+                    status=DomainTicketStatus.REJECTED
+                ).count(),
+            },
+            "domain": {
+                "total": await DomainEntity.all().count(),
+            },
+            "user": {
+                "total": await UserEntity.all().count(),
+            },
+        }
