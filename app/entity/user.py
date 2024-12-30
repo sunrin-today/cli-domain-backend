@@ -7,5 +7,5 @@ class User(Model):
     email = fields.CharField(max_length=100)  # google.user_data["email"]
     avatar = fields.CharField(max_length=200)  # google.user_data["avatar"]
     limit = fields.IntField(default=5)  # google.user_data["limit"]
-    tickets = fields.ManyToManyField("models.DomainTicket", related_name="users")
-    domains = fields.ManyToManyField("models.Domain", related_name="users")
+    tickets = fields.ManyToManyField("models.DomainTicket", related_name="user")
+    domains = fields.ManyToManyField("models.Domain", related_name="user")
