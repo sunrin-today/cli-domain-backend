@@ -41,9 +41,12 @@ class Settings(BaseSettings):
     DISCORD_PUBLIC_KEY: str
     DISCORD_BOT_TOKEN: str
     DISCORD_VERIFY_CHANNEL_ID: str
+    DISCORD_LOG_CHANNEL_ID: str
     DISCORD_VERIFY_ROLE_ID: str
 
     USER_DOMAIN_MAXIMUM: int
+    EMAIL_SENDER_ADDRESS: str
+    EMAIL_API_KEY: str
 
     @staticmethod
     @field_validator("SERVER_PORT")
