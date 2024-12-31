@@ -46,3 +46,16 @@ def build_domain_record_view(record_data: BaseSchema) -> dict:
                 new_value = str(value)
             record_string_dictionary[key] = new_value
     return record_string_dictionary
+
+
+class DomainRecordVerify:
+
+    @staticmethod
+    def vercel(text: str, domain_name: str) -> bool:
+        if not text.startswith("vc-domain-verify="):
+            return False
+
+        if domain_name not in text:
+            return False
+
+        return True
