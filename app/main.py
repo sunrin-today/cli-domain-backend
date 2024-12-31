@@ -67,6 +67,7 @@ def bootstrap() -> FastAPI:
                 "app.router.auth",
                 "app.router.domain",
                 "app.router.discord",
+                "app.router.transfer",
             ]
         )
         _log.info("Container Wiring complete")
