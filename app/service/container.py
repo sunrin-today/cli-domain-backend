@@ -8,6 +8,7 @@ from app.service.email import EmailRequesterService
 from app.service.google import GoogleRequestService
 from app.service.localdb import LocalDBService
 from app.service.session import LoginSessionService, UserSessionService
+from app.service.transfer import DomainTransferService
 
 
 class ServiceContainer(containers.DeclarativeContainer):
@@ -22,3 +23,4 @@ class ServiceContainer(containers.DeclarativeContainer):
     domain: DomainService = providers.Singleton(DomainService)
     discord: DiscordRequester = providers.Factory(DiscordRequester)
     email: EmailRequesterService = providers.Factory(EmailRequesterService)
+    transfer: DomainTransferService = providers.Factory(DomainTransferService)
