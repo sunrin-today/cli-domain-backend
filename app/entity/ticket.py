@@ -45,7 +45,7 @@ class DomainTicket(Model):
     content = fields.CharField(max_length=255, null=True)
     record_type = fields.CharField(max_length=10)
     data = fields.JSONField(null=True)
-    proxied = fields.BooleanField(default=False)
+    proxied = fields.BooleanField(default=False, null=True)
     ttl = fields.CharField(max_length=10, default=DomainTTLType.AUTO.value)
     created_at = fields.DatetimeField(auto_now_add=True)
     status = fields.IntEnumField(DomainTicketStatus, default=DomainTicketStatus.PENDING)
