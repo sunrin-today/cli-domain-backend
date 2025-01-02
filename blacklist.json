@@ -1,0 +1,10 @@
+{
+  "blacklist": [
+    "_vercel",
+    "_domainkey",
+    "_bimi",
+    "_dmarc",
+    "_spf",
+    "_tesT_blacklistkeyword"
+  ]
+}
