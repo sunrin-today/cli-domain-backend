@@ -1,3 +1,5 @@
+from typing import Literal
+
 from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Query, Depends, status, Request, Body
 from fastapi_restful.cbv import cbv
@@ -124,11 +126,11 @@ class DomainController:
         ),
         discord_service: DiscordRequester = Depends(Provide[ServiceContainer.discord]),
     ) -> APIResponse[dict]:
-        if register_domain_filter(domain):
+        if not register_domain_filter(domain):
             raise APIError(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 error_code=ErrorCode.DOMAIN_NOT_ALLOWED,
-                message="도메인 등록이 불가능합니다.",
+                message="도메인을 사용할 수 없습니다.",
             )
         main_domain = get_main_domain(domain)
         available_domains = await localdb_service.available_domains()
@@ -349,7 +351,7 @@ class DomainController:
     async def get_tickets(
         self,
         user: User = Depends(get_current_user_entity),
-        ticket_filter: str = Query("filter"),
+        ticket_filter: Literal["pending", "approved", "rejected"] = Query("pending"),
     ) -> APIResponse[dict]:
         if ticket_filter == "pending":
             filtered_tickets = await user.tickets.filter(
@@ -369,19 +371,21 @@ class DomainController:
 
         return APIResponse(
             data={
+                "filter": ticket_filter,
                 "tickets": [
                     {
                         "id": ticket.id,
                         "name": ticket.name,
                         "content": ticket.content,
+                        "type": ticket.record_type,
                         "data": ticket.data,
                         "proxied": ticket.proxied,
                         "ttl": ticket.ttl,
                         "createdAt": ticket.created_at,
-                        "status": ticket.status,
+                        "status": ticket.status.name,
                     }
                     for ticket in filtered_tickets
-                ]
+                ],
             },
             message="도메인 티켓 목록 조회가 완료되었습니다.",
         )
