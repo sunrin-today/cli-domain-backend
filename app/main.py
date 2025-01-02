@@ -2,8 +2,10 @@ from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 import sentry_sdk
+import os
 from dependency_injector.wiring import inject
 from fastapi import FastAPI
+from starlette.staticfiles import StaticFiles
 from tortoise import generate_config, Tortoise
 from tortoise.contrib.fastapi import RegisterTortoise
 
@@ -11,6 +13,8 @@ from app.logger import use_logger
 from app.core.config import settings
 from app.service.container import ServiceContainer
 from app.router import router as api_router
+
+static_dir = os.path.abspath(os.path.join(os.path.dirname("."), "static"))
 
 _log = use_logger(__name__)
 
@@ -48,6 +52,7 @@ def bootstrap() -> FastAPI:
         application: FastAPI,
     ) -> AsyncGenerator[None, None]:
         _log.info("Starting application")
+        application.mount("/static", StaticFiles(directory=static_dir), name="static")
         tortoise_config = generate_config(
             settings.DATABASE_URI,
             app_modules={
@@ -68,6 +73,8 @@ def bootstrap() -> FastAPI:
                 "app.router.domain",
                 "app.router.discord",
                 "app.router.transfer",
+                "app.router.application",
+                "app.core.deps",
             ]
         )
         _log.info("Container Wiring complete")
