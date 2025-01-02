@@ -3,6 +3,9 @@ from datetime import timedelta
 
 from fastapi import status
 from starlette.websockets import WebSocket
+
+from app.core.error import ErrorCode
+from app.core.response import APIError
 from app.core.websocket import ConnectionManager
 
 from app.core.string import generate_token
@@ -82,10 +85,17 @@ class UserSessionService:
 
     async def get_user_id(self, token: str) -> str:
         bytes_value = await self.redis.get(f"{self.KEY}:{token}")
+        if not bytes_value:
+            raise APIError(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                error_code=ErrorCode.INVALID_SESSION,
+                message="Invalid session token",
+            )
         return bytes_value.decode("utf-8")
 
     async def exist_token(self, token: str) -> bool:
         return await self.redis.exists(f"{self.KEY}:{token}")
 
     async def delete_token(self, token: str) -> None:
+        _login_log.info(f"Delete token: {token}")
         await self.redis.delete(f"{self.KEY}:{token}")
