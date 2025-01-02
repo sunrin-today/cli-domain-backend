@@ -1,8 +1,11 @@
+from typing import Union
+
 from dependency_injector.wiring import Provide, inject
+from dns.ipv4 import inet_aton
 from fastapi import APIRouter, Query, Depends, status, Request, Body, BackgroundTasks
 from fastapi_restful.cbv import cbv
 from slowapi import Limiter
-from starlette.responses import HTMLResponse
+from starlette.responses import HTMLResponse, RedirectResponse
 
 from app.core.deps import get_current_user_entity, get_user_token
 from app.core.string import get_main_domain, build_domain_record_view
@@ -40,7 +43,6 @@ class DomainTransferController:
 
     @router.post(
         "/create",
-        description="TTL을 1로 설정하면 Cloudflare에서 AUTO로 설정됩니다.",
     )
     @limiter.limit("20/minute")
     @inject
@@ -58,11 +60,11 @@ class DomainTransferController:
             Provide[ServiceContainer.transfer]
         ),
     ) -> APIResponse[dict]:
-        if register_domain_filter(data.name):
+        if not register_domain_filter(data.name):
             raise APIError(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 error_code=ErrorCode.DOMAIN_NOT_ALLOWED,
-                message="도메인 등록이 불가능합니다.",
+                message="이 도메인은 사용할 수 없습니다.",
             )
         main_domain = get_main_domain(data.name)
         available_domains = await localdb_service.available_domains()
@@ -100,14 +102,35 @@ class DomainTransferController:
             message="도메인 초대링크 전송이 완료되었습니다.",
         )
 
-    @router.get("/accept")
+    @router.get(
+        "/accept",
+        description="실제 수락용 아님. 이메일 전송 링크용. 자동으로 구글로그인으로 리다이렉트됨.",
+    )
+    @inject
     async def accept_transfer(
         self,
         code: str = Query(None, description="도메인 초대 코드"),
-    ) -> HTMLResponse:
+        transfer_service: DomainTransferService = Depends(
+            Provide[ServiceContainer.transfer]
+        ),
+    ):
         if not code:
             return HTMLResponse(
                 content="<h1>Sunrin Today Domain</h1><br>"
                 "<p>도메인 초대 코드가 유효하지 않습니다</p>"
             )
-        return HTMLResponse(content="도메인 초대 수락 페이지")
+        try:
+            _invite_entity = await transfer_service.get_transfer_invite(code)
+        except APIError:
+            return HTMLResponse(
+                content="<h1>Sunrin Today Domain</h1><br>"
+                "<p>존재하지 않는 초대 코드입니다</p>"
+            )
+
+        app_url = "@transfer/accept?code=" + code
+        return RedirectResponse(
+            url=settings.BACKEND_HOST
+            + "/api/v1/auth/authorization-url?session_id="
+            + app_url,
+            status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+        )

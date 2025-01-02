@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta
 from copy import deepcopy
+from imghdr import test_rast
+from uuid import uuid4
 
 from fastapi import status
 
@@ -22,6 +24,7 @@ class DomainTransferService:
     ) -> TransferInviteEntity:
         one_week_later = datetime.now() + timedelta(days=7)
         transfer_invite = await TransferInviteEntity.create(
+            id=uuid4(),
             name=domain.name,
             domain=domain,
             user=user,
@@ -34,13 +37,20 @@ class DomainTransferService:
     async def get_transfer_invite(
         transfer_invite_id: str,
     ) -> TransferInviteEntity:
-        return await TransferInviteEntity.get(id=transfer_invite_id)
+        invite_entity = await TransferInviteEntity.get_or_none(id=transfer_invite_id)
+        if not invite_entity:
+            raise APIError(
+                status_code=status.HTTP_404_NOT_FOUND,
+                error_code=ErrorCode.INVALID_INVITE,
+                message="존재하지 않는 초대입니다.",
+            )
+        return invite_entity
 
     @staticmethod
     async def accept_transfer_invite(
         transfer_invite: TransferInviteEntity, target_user: UserEntity
     ) -> DomainEntity:
-        if transfer_invite.expired_at < datetime.now():
+        if transfer_invite.expired_at.replace(tzinfo=None) < datetime.now():
             await transfer_invite.delete()
             raise APIError(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -53,10 +63,15 @@ class DomainTransferService:
                 error_code=ErrorCode.INVALID_INVITE,
                 message="유효하지 않은 초대입니다.",
             )
-        await transfer_invite.domain.update(user=target_user)
-        domain_entity = deepcopy(transfer_invite.domain)
+        await transfer_invite.fetch_related("domain")
+        new_domain_entity = await DomainEntity.create(
+            name=transfer_invite.name,
+            record_id=transfer_invite.domain.record_id,
+        )
+        await target_user.domains.add(new_domain_entity)
         await transfer_invite.delete()
-        return domain_entity
+        await transfer_invite.domain.delete()
+        return new_domain_entity
 
     @staticmethod
     async def reject_transfer_invite(
