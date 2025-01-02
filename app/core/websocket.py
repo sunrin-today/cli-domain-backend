@@ -1,4 +1,7 @@
 from fastapi import WebSocket
+from app.logger import use_logger
+
+logger = use_logger("websocket")
 
 
 class ConnectionManager:
@@ -15,7 +18,11 @@ class ConnectionManager:
         self.subscribe_websocket[session_id] = websocket
 
     async def send_message(self, session_id: str, message: dict):
-        await self.subscribe_websocket[session_id].send_json(message)
+        try:
+            await self.subscribe_websocket[session_id].send_json(message)
+        except RuntimeError:
+            logger.info(f"Session {session_id} is already closed")
+            pass
 
     async def disconnect(self, session_id: str, **kwargs):
         await self.subscribe_websocket[session_id].close(**kwargs)
