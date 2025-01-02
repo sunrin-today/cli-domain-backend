@@ -22,8 +22,8 @@ from app.service.container import ServiceContainer
 from app.service.discord_interaction import (
     DiscordRequester,
     TicketRespondDiscordComponent,
+    check_discord_role,
 )
-from app.service.discord_old import check_discord_role
 from app.service.domain import DomainService
 from app.service.email import EmailRequesterService
 from app.entity import DomainTicket as DomainTicketEntity
@@ -100,47 +100,21 @@ class DiscordController:
         domain_service: DomainService = Depends(Provide[ServiceContainer.domain]),
         localdb_service: LocalDBService = Depends(Provide[ServiceContainer.localdb]),
     ) -> dict:
-        if not await DomainTicketEntity.exists(id=ticket_id):
-            return client.response.send_message(
-                content="티켓을 찾을 수 없습니다.",
+        try:
+            if not await DomainTicketEntity.exists(id=ticket_id):
+                return client.response.send_message(
+                    content="티켓을 찾을 수 없습니다.",
+                )
+            ticket_entity, domain_entity = await domain_service.approved_ticket(
+                ticket_id
             )
-        ticket_entity, domain_entity = await domain_service.approved_ticket(ticket_id)
-        main_domain = get_main_domain(domain_entity.name)
-        target_zone_id = await localdb_service.get_zone_id(main_domain)
-        await ticket_entity.fetch_related("user")
-        target_user = await ticket_entity.user.all()
-        await target_user[0].domains.add(domain_entity)
-        record_created_data = await cloudflare_service.create_record(
-            zone_id=target_zone_id,
-            data={
-                "name": ticket_entity.name,
-                "content": ticket_entity.content,
-                "type": ticket_entity.record_type,
-                "ttl": int(ticket_entity.ttl),
-                "proxied": ticket_entity.proxied,
-            },
-            entity_id=domain_entity.id,
-        )
-        record_zone_id = record_created_data["result"]["id"]
-        domain_entity.record_id = record_zone_id
-        await domain_entity.save()
-        if record_created_data["success"] is False:
-            await client.create_log_service_error(
-                user=target_user[0],
-                error_name="Cloudflare Record 생성 실패",
-                description=f"Ticket ID: {ticket_id}",
-                data=record_created_data,
-            )
-            await email_service.send_failed_email(
-                to_email=target_user[0].email,
-                domain_name=ticket_entity.name,
-                reason="Cloudflare 오류, Ticket ID: " + ticket_id,
-            )
-        else:
-            await client.create_log_new_domain(
-                user=target_user[0],
-                domain=domain_entity,
-                ticket=ticket_entity,
+            main_domain = get_main_domain(domain_entity.name)
+            target_zone_id = await localdb_service.get_zone_id(main_domain)
+            await ticket_entity.fetch_related("user")
+            target_user = await ticket_entity.user.all()
+            await target_user[0].domains.add(domain_entity)
+            record_created_data = await cloudflare_service.create_record(
+                zone_id=target_zone_id,
                 data={
                     "name": ticket_entity.name,
                     "content": ticket_entity.content,
@@ -148,10 +122,53 @@ class DiscordController:
                     "ttl": int(ticket_entity.ttl),
                     "proxied": ticket_entity.proxied,
                 },
+                entity_id=domain_entity.id,
             )
-            await email_service.send_approved_email(
-                to_email=target_user[0].email,
-                domain_name=ticket_entity.name,
+            record_zone_id = record_created_data["result"]["id"]
+            domain_entity.record_id = record_zone_id
+            await domain_entity.save()
+            if record_created_data["success"] is False:
+                await client.create_log_service_error(
+                    user=target_user[0],
+                    error_name="Cloudflare Record 생성 실패",
+                    description=f"Ticket ID: {ticket_id}",
+                    data=record_created_data,
+                )
+                await email_service.send_failed_email(
+                    to_email=target_user[0].email,
+                    domain_name=ticket_entity.name,
+                    reason="Cloudflare 오류, Ticket ID: " + ticket_id,
+                )
+            else:
+                await client.create_log_new_domain(
+                    user=target_user[0],
+                    domain=domain_entity,
+                    ticket=ticket_entity,
+                    data={
+                        "name": ticket_entity.name,
+                        "content": ticket_entity.content,
+                        "type": ticket_entity.record_type,
+                        "ttl": int(ticket_entity.ttl),
+                        "proxied": ticket_entity.proxied,
+                    },
+                )
+                await email_service.send_approved_email(
+                    to_email=target_user[0].email,
+                    domain_name=ticket_entity.name,
+                )
+        except Exception as e:
+            ticket_entity, domain_entity = await domain_service.approved_ticket(
+                ticket_id
+            )
+            await ticket_entity.fetch_related("user")
+            target_user = await ticket_entity.user.all()
+            await client.create_log_service_error(
+                user=target_user[0],
+                error_name="도메인 생성 오류",
+                description=f"Ticket ID: {ticket_id}",
+                data={
+                    "traceback": str(e),
+                },
             )
 
     @staticmethod
