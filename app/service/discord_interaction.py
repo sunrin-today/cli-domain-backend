@@ -31,6 +31,10 @@ _http_log = use_logger("aiohttp-request")
 _discord_log = use_logger("discord-request-service")
 
 
+def check_discord_role(roles: list[str], specific_role_id: int) -> bool:
+    return any(role_id == str(specific_role_id) for role_id in roles)
+
+
 class TicketRespondDiscordComponent(ui.View):
     def __init__(self, approve: bool, ticket_id: str) -> None:
         super().__init__(timeout=None)
