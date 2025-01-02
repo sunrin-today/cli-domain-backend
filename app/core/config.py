@@ -43,10 +43,12 @@ class Settings(BaseSettings):
     DISCORD_VERIFY_CHANNEL_ID: str
     DISCORD_LOG_CHANNEL_ID: str
     DISCORD_VERIFY_ROLE_ID: str
+    VERCEL_INTEGRATION_NAME: str
 
     USER_DOMAIN_MAXIMUM: int
     EMAIL_SENDER_ADDRESS: str
     EMAIL_API_KEY: str
+    BACKEND_HOST: str
 
     @staticmethod
     @field_validator("SERVER_PORT")
