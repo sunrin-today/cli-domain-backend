@@ -1,7 +1,7 @@
 import redis.exceptions
 from dependency_injector.wiring import Provide, inject
 
-from fastapi import Depends, HTTPException, status, Request
+from fastapi import Depends, HTTPException, status, Request, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.entity.user import User as UserEntity
@@ -40,6 +40,67 @@ async def get_current_user_id(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
         )
+
+
+@inject
+async def get_query_user_entity(
+    token: str = Query(...),
+    user_session: UserSessionService = Depends(Provide[ServiceContainer.user_session]),
+) -> tuple[UserEntity, str] | None:
+    try:
+        if await user_session.exist_token(token) is None:
+            _log.error("Invalid authentication token")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication token",
+            )
+
+        _log.info(f"Token: {token}")
+
+        user_id = await user_session.get_user_id(token)
+        _log.info(f"User ID: {user_id}")
+
+        if not await UserEntity.exists(id=str(user_id)):
+            _log.error("User not found")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication token",
+            )
+
+        await user_session.update_token(token)
+
+        return await UserEntity.get(id=user_id), token
+    except redis.exceptions.RedisError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error",
+        )
+
+
+@inject
+async def get_user_token(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    user_session: UserSessionService = Depends(Provide[ServiceContainer.user_session]),
+) -> str:
+    token = credentials.credentials
+    if await user_session.exist_token(token) is None:
+        _log.error("Invalid authentication token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token",
+        )
+
+    user_id = await user_session.get_user_id(token)
+    _log.info(f"User ID: {user_id}")
+
+    if not await UserEntity.exists(id=str(user_id)):
+        _log.error("User not found")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token",
+        )
+
+    return token
 
 
 @inject
