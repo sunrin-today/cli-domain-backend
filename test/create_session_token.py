@@ -6,7 +6,6 @@ API_URL = "http://localhost/api/v1"
 
 
 async def parse_data(response: aiohttp.ClientResponse) -> dict:
-    print()
     if response.content_type == "application/json":
         response_json = await response.json()
         print(response_json)
