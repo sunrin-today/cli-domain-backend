@@ -60,7 +60,7 @@ class EmailRequesterService:
 
     async def send_email(self, to_email: str, subject: str, text: str) -> None:
         email_data = {
-            "from": settings.EMAIL_SENDER_ADDRESS,
+            "from": "Sunrin Domain <" + settings.EMAIL_SENDER_ADDRESS + ">",
             "to": to_email,
             "subject": subject,
             "text": text,
@@ -129,7 +129,7 @@ class EmailRequesterService:
         text = [
             f"안녕하세요. 선린 도메인입니다.",
             f"{user_name}님이 {domain_name} 도메인을 이전하고자 합니다.",
-            f"https://domain-api.sunrin.kr/api/v1/transfer-accept?id={transfer_entity_id}",
+            f"https://domain-api.sunrin.kr/api/v1/transfer/accept?code={transfer_entity_id}",
             "위 링크는 메인을 클릭하면 도메인 이전을 수락할 수 있으며 일주일 후에 만료됩니다.",
             "자세한 문의는 domain@sunrin.kr로 문의해주세요.",
             "감사합니다.",
