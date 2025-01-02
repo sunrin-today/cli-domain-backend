@@ -1,6 +1,7 @@
 import os
 import string
 import secrets
+from app.core.config import settings
 from ipaddress import IPv4Address, IPv6Address
 from app.core.pydantic_model import BaseSchema
 from app.schema.register import DigestType
@@ -59,3 +60,57 @@ class DomainRecordVerify:
             return False
 
         return True
+
+
+def parse_application_url(url: str):
+    try:
+        if not url.startswith("@"):
+            raise ValueError("URL must start with '@'")
+        parts = url[1:].split("/")
+
+        if len(parts) != 2:
+            raise ValueError("Invalid URL format")
+
+        application_name = parts[0]
+
+        if "?" in parts[1]:
+            route, params = parts[1].split("?")
+            params_dict = dict(param.split("=") for param in params.split("&"))
+        else:
+            route = parts[1]
+            params_dict = {}
+
+        return {
+            "application": application_name,
+            "route": route,
+            "parameters": params_dict,
+        }
+
+    except Exception as e:
+        raise ValueError(f"Invalid URL format: {str(e)}")
+
+
+def create_application_redirect_url(
+    base_url: str, application: str, route: str, params: dict | None = None
+):
+    try:
+        base_url = base_url.rstrip("/")
+        api_path = f"/api/v1/app/{application}/{route}"
+        full_url = base_url + api_path
+
+        if params and isinstance(params, dict):
+            query_params = "&".join([f"{key}={value}" for key, value in params.items()])
+            full_url = f"{full_url}?{query_params}"
+
+        return full_url
+
+    except Exception as e:
+        raise ValueError(f"Invalid URL format: {str(e)}")
+
+
+def create_application_reject_url(base_url: str, app_name: str) -> str:
+    return f"{base_url}/app/reject?name={app_name}"
+
+
+def create_vercel_integration_url(state: str) -> str:
+    return f"https://vercel.com/integrations/{settings.VERCEL_INTEGRATION_NAME}/new?state={state}"
