@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>로그인 완료</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', path='/login.css') }}" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        {% if status == "success" %}
+        <i class="fas fa-check-circle icon-success"></i>
+        <h1>로그인 완료</h1>
+        {% elif status == "failed" %}
+        <i class="fa-solid fa-circle-exclamation icon-failed"></i>
+        <h1>로그인 실패</h1>
+        {% endif %}
+        <p class="message">{{message}}</p>
+        <p class="message">{{detail}}</p>
+        <p class="support">
+            문제가 있으신가요? <a href="https://discord.gg/KyeRVS64NH">고객센터</a>로 문의해주세요.<br>
+            {{login_data}}
+        </p>
+    </div>
+</body>
+</html>
