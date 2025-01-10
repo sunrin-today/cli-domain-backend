@@ -11,3 +11,11 @@ class HomeSchema(BaseModel):
 class TransferDomainDTO(BaseSchema):
     name: str
     user_email: EmailStr
+
+
+class VercelCallbackDTO(BaseSchema):
+    code: str
+    state: str
+    team_id: str
+    configuration_id: str
+    next: str
