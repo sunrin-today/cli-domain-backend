@@ -9,6 +9,7 @@ from app.service.google import GoogleRequestService
 from app.service.localdb import LocalDBService
 from app.service.session import LoginSessionService, UserSessionService
 from app.service.transfer import DomainTransferService
+from app.service.vercel import VercelRequestService
 
 
 class ServiceContainer(containers.DeclarativeContainer):
@@ -24,3 +25,4 @@ class ServiceContainer(containers.DeclarativeContainer):
     discord: DiscordRequester = providers.Factory(DiscordRequester)
     email: EmailRequesterService = providers.Factory(EmailRequesterService)
     transfer: DomainTransferService = providers.Factory(DomainTransferService)
+    vercel: VercelRequestService = providers.Factory(VercelRequestService)
