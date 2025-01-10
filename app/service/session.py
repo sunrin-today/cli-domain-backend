@@ -23,12 +23,20 @@ class LoginSessionService:
         self.redis = manager.get_connection()
         self.subscribe_websocket = websocket
 
-    async def create_new_session(self, session_id: str | None = None) -> str:
+    async def create_new_session(
+        self,
+        session_id: str | None = None,
+        application_url: str | None = None,
+        user_id: str | None = None,
+    ) -> str:
         if not session_id:
             session_id = str(uuid.uuid4())
-        session_data = {
-            "user_id": "",
-        }
+        session_data = {"type": "login", "user_id": "", "application_url": ""}
+        if application_url:
+            session_data["type"] = "application"
+            session_data["application_url"] = application_url
+        if user_id:
+            session_data["user_id"] = user_id
         await self.redis.hmset(f"{self.KEY}:{session_id}", session_data)
         await self.redis.expire(f"{self.KEY}:{session_id}", self.EXPIRATION)
         return session_id
@@ -36,9 +44,19 @@ class LoginSessionService:
     async def set_session_user(self, session_id: str, user_id: str) -> None:
         await self.redis.hset(f"{self.KEY}:{session_id}", "user_id", user_id)
 
-    async def get_session_user_id(self, session_id: str) -> str:
+    async def get_session_user_id(self, session_id: str) -> str | None:
         bytes_value = await self.redis.hget(f"{self.KEY}:{session_id}", "user_id")
+        return bytes_value.decode("utf-8") or None
+
+    async def get_session_type(self, session_id: str) -> str:
+        bytes_value = await self.redis.hget(f"{self.KEY}:{session_id}", "type")
         return bytes_value.decode("utf-8")
+
+    async def get_session_application_url(self, session_id: str) -> str | None:
+        bytes_value = await self.redis.hget(
+            f"{self.KEY}:{session_id}", "application_url"
+        )
+        return bytes_value.decode("utf-8") or None
 
     async def exist_session(self, session_id: str) -> bool:
         return await self.redis.exists(f"{self.KEY}:{session_id}")
