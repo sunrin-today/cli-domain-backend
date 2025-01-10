@@ -1,8 +1,9 @@
 import uuid
+from typing import Literal
 
 import aiogoogle.excs
 from dependency_injector.wiring import Provide, inject
-from fastapi import APIRouter, Query, Depends, status, Request, BackgroundTasks
+from fastapi import APIRouter, Query, Depends, status, Request, BackgroundTasks, Body
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi_restful.cbv import cbv
@@ -17,6 +18,7 @@ from app.core.string import (
     parse_application_url,
     create_application_redirect_url,
     create_application_reject_url,
+    create_callback_url,
 )
 from app.entity import User
 from app.core.error import ErrorCode
@@ -53,9 +55,23 @@ class AuthController:
         google_service: GoogleRequestService = Depends(
             Provide[ServiceContainer.google]
         ),
+        login_service: LoginSessionService = Depends(
+            Provide[ServiceContainer.login_session]
+        ),
     ) -> RedirectResponse:
+        if not await login_service.exist_session(session_id):
+            raise APIError(
+                status_code=status.HTTP_404_NOT_FOUND,
+                error_code=ErrorCode.INVALID_SESSION,
+                message="Session not found",
+            )
+        session_type = await login_service.get_session_type(session_id)
         url = await google_service.get_authorization_url(session_id)
-        return RedirectResponse(url=url)
+        if session_type == "login":
+            return RedirectResponse(url=url)
+        elif session_type == "application":
+            callback_url = create_callback_url(session_id=session_id, without_code=True)
+            return RedirectResponse(url=callback_url)
 
     @router.get("/app/rejected")
     async def app_rejected(
@@ -91,43 +107,64 @@ class AuthController:
         discord_service: DiscordRequester = Depends(Provide[ServiceContainer.discord]),
         email_service: EmailRequesterService = Depends(Provide[ServiceContainer.email]),
     ) -> HTMLResponse:
-        try:
-            credentials = await google_service.fetch_user_credentials(code)
-            user_data = await google_service.fetch_user_info(credentials)
-        except aiogoogle.excs.HTTPError as e:
-            _log.error(f"Google API Error: {e.res}")
+        if not code == "noauth":
+            try:
+                credentials = await google_service.fetch_user_credentials(code)
+                user_data = await google_service.fetch_user_info(credentials)
+            except aiogoogle.excs.HTTPError as e:
+                _log.error(f"Google API Error: {e.res}")
+                return templates.TemplateResponse(
+                    request=request,
+                    name="login.html",
+                    context={
+                        "status": "failed",
+                        "message": f"구글 로그인 오류입니다.",
+                        "detail": str(e.res),
+                        "login_data": session_id,
+                    },
+                )
+
+            if not await User.filter(email=user_data["email"]).exists():
+                user_entity = await User.create(
+                    id=uuid.uuid4(),
+                    nickname=user_data["name"],
+                    email=user_data["email"],
+                    avatar=user_data["picture"],
+                )
+                await discord_service.create_log_user_create(
+                    email=user_data["email"],
+                    name=user_data["name"],
+                    avatar=user_data["picture"],
+                )
+                await email_service.send_welcome_email(
+                    to_email=user_data["email"],
+                    name=user_data["name"],
+                )
+            else:
+                user_entity = await User.filter(email=user_data["email"]).first()
+
+        else:
+            stored_user_id = await login_service.get_session_user_id(session_id)
+            user_entity = await User.get(id=stored_user_id)
+
+        if not await login_service.exist_session(session_id=session_id):
             return templates.TemplateResponse(
                 request=request,
                 name="login.html",
                 context={
                     "status": "failed",
-                    "message": f"구글 로그인 오류입니다.",
-                    "detail": str(e.res),
+                    "message": f"알 수 없는 세션",
+                    "detail": "로그인 세션을 찾을 수 없습니다.",
                     "login_data": session_id,
                 },
             )
 
-        if not await User.filter(email=user_data["email"]).exists():
-            user_entity = await User.create(
-                id=uuid.uuid4(),
-                nickname=user_data["name"],
-                email=user_data["email"],
-                avatar=user_data["picture"],
+        login_type = await login_service.get_session_type(session_id)
+        if login_type == "application":
+            application_url = await login_service.get_session_application_url(
+                session_id
             )
-            await discord_service.create_log_user_create(
-                email=user_data["email"],
-                name=user_data["name"],
-                avatar=user_data["picture"],
-            )
-            await email_service.send_welcome_email(
-                to_email=user_data["email"],
-                name=user_data["name"],
-            )
-        else:
-            user_entity = await User.filter(email=user_data["email"]).first()
-
-        if session_id.startswith("@"):
-            parsed_data = parse_application_url(session_id)
+            parsed_data = parse_application_url(application_url)
             if not parsed_data["application"] in ["vercel", "transfer"]:
                 return templates.TemplateResponse(
                     request=request,
@@ -140,12 +177,7 @@ class AuthController:
                     },
                 )
             new_access_token = await user_session.create_new_token(str(user_entity.id))
-            temporary_application_only_id = (
-                "App" + parsed_data["application"].capitalize() + str(uuid.uuid4())
-            )
-            await login_service.push_token_to_session(
-                temporary_application_only_id, new_access_token
-            )
+            await login_service.push_token_to_session(session_id, new_access_token)
             parsed_data["parameters"].update({"token": new_access_token})
             redirect_url = create_application_redirect_url(
                 base_url=settings.BACKEND_HOST,
@@ -197,37 +229,38 @@ class AuthController:
                     ),
                 },
             )
-
-        if not await login_service.exist_session(session_id=session_id):
+        elif login_type == "login":
+            await login_service.set_session_user(
+                session_id=session_id, user_id=str(user_entity.id)
+            )
+            await discord_service.create_log_refresh_session(user=user_entity)
+            if login_service.exist_subscriber(session_id):
+                new_access_token = await user_session.create_new_token(
+                    str(user_entity.id)
+                )
+                await login_service.push_token_to_session(session_id, new_access_token)
+                await login_service.delete_session(session_id)
+            return templates.TemplateResponse(
+                request=request,
+                name="login.html",
+                context={
+                    "status": "success",
+                    "message": f"로그인에 성공했습니다",
+                    "detail": "콘솔로 다시 돌아가세요",
+                    "login_data": session_id,
+                },
+            )
+        else:
             return templates.TemplateResponse(
                 request=request,
                 name="login.html",
                 context={
                     "status": "failed",
-                    "message": f"알 수 없는 세션",
-                    "detail": "로그인 세션을 찾을 수 없습니다.",
+                    "message": f"세션 데이터가 잘못됨",
+                    "detail": "이 세션의 데이터가 잘못되었습니다.",
                     "login_data": session_id,
                 },
             )
-
-        await login_service.set_session_user(
-            session_id=session_id, user_id=str(user_entity.id)
-        )
-        await discord_service.create_log_refresh_session(user=user_entity)
-        if login_service.exist_subscriber(session_id):
-            new_access_token = await user_session.create_new_token(str(user_entity.id))
-            await login_service.push_token_to_session(session_id, new_access_token)
-            await login_service.delete_session(session_id)
-        return templates.TemplateResponse(
-            request=request,
-            name="login.html",
-            context={
-                "status": "success",
-                "message": f"로그인에 성공했습니다",
-                "detail": "콘솔로 다시 돌아가세요",
-                "login_data": session_id,
-            },
-        )
 
     @router.get("/login/session")
     @inject
@@ -268,12 +301,42 @@ class AuthController:
     async def create_new_session(
         self,
         request: Request,
+        application_url: str = Body(
+            None, embed=True, example="@vercel/domain?name=example"
+        ),
+        token: str | None = Body(
+            None,
+            embed=True,
+            example="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
+            description="토큰 넣으면 로그인 생략, application_url으로 생성할 경우 token은 필수",
+        ),
         login_service: LoginSessionService = Depends(
             Provide[ServiceContainer.login_session]
         ),
+        user_service: UserSessionService = Depends(
+            Provide[ServiceContainer.user_session]
+        ),
     ) -> APIResponse[dict]:
-        session_id = await login_service.create_new_session()
-        return APIResponse(data={"session_id": session_id}, message="Session created")
+        if not application_url:
+            session_id = await login_service.create_new_session()
+            return APIResponse(
+                data={"session_id": session_id}, message="Session created"
+            )
+        else:
+            if not token:
+                raise APIError(
+                    error_code=ErrorCode.INVALID_IDENTITY,
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    message="application url로 생성할 경우, 토큰은 필수입니다",
+                )
+            user_id = await user_service.get_user_id(token)
+            session_id = await login_service.create_new_session(
+                application_url=application_url, user_id=user_id
+            )
+            return APIResponse(
+                data={"session_id": session_id, "application_url": application_url},
+                message="Session created",
+            )
 
     @router.get("/@me")
     @inject
@@ -281,12 +344,21 @@ class AuthController:
         self,
         user: User = Depends(get_current_user_entity),
     ) -> APIResponse[dict]:
+        basic_user_data = {
+            "id": user.id,
+            "nickname": user.nickname,
+            "email": user.email,
+            "app": {},
+        }
+        if user.data.get("vercel"):
+            basic_user_data["app"]["vercel"] = {
+                "user_id": user.data["vercel"]["user_id"],
+                "email": user.data["vercel"]["email"],
+                "name": user.data["vercel"]["name"],
+                "username": user.data["vercel"]["username"],
+            }
         return APIResponse(
-            data={
-                "id": user.id,
-                "nickname": user.nickname,
-                "email": user.email,
-            },
+            data=basic_user_data,
             message="User information",
         )
 
