@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     EMAIL_API_KEY: str
     BACKEND_HOST: str
 
+    VERCEL_CLIENT_ID: str
+    VERCEL_CLIENT_SECRET: str
+
     @staticmethod
     @field_validator("SERVER_PORT")
     def check_port_range(value: int):
