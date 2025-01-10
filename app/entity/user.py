@@ -9,3 +9,6 @@ class User(Model):
     limit = fields.IntField(default=5)  # google.user_data["limit"]
     tickets = fields.ManyToManyField("models.DomainTicket", related_name="user")
     domains = fields.ManyToManyField("models.Domain", related_name="user")
+    data = fields.JSONField(
+        default={}
+    )  # {"vercel": {"access_token": "", "team_id": ""}}
