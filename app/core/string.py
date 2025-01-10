@@ -114,3 +114,12 @@ def create_application_reject_url(base_url: str, app_name: str) -> str:
 
 def create_vercel_integration_url(state: str) -> str:
     return f"https://vercel.com/integrations/{settings.VERCEL_INTEGRATION_NAME}/new?state={state}"
+
+
+def create_callback_url(
+    session_id: str, without_code: bool = True, code: str = None
+) -> str:
+    code = "noauth" if without_code else code
+    return (
+        f"{settings.BACKEND_HOST}/api/v1/auth/callback?code={code}&state={session_id}"
+    )
