@@ -5,12 +5,14 @@ from fastapi_restful.cbv import cbv
 from starlette.responses import RedirectResponse, HTMLResponse
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from app.core.deps import get_current_user_entity, get_query_user_entity
-from app.entity import User
+from app.entity import User as UserEntity
 from app.core.error import ErrorCode
 from app.core.response import APIResponse, APIError
 from app.router.domain import register_domain_filter
+from app.schema.home import VercelCallbackDTO
 from app.service.cloudflare import CloudflareRequestService
 from app.service.container import ServiceContainer
 from app.service.domain import DomainService
@@ -22,11 +24,11 @@ from app.service.discord_interaction import DiscordRequester
 from app.logger import use_logger
 from app.core.redis import settings
 from app.core.string import (
-    DomainRecordVerify,
     get_main_domain,
     create_vercel_integration_url,
 )
 from app.service.transfer import DomainTransferService
+from app.service.vercel import VercelRequestService
 
 router = APIRouter(
     prefix="/app",
@@ -50,7 +52,7 @@ class ApplicationController:
         self,
         request: Request,
         name: str = Query(...),
-        credential: tuple[User, str] = Depends(get_query_user_entity),
+        credential: tuple[UserEntity, str] = Depends(get_query_user_entity),
         localdb_service: LocalDBService = Depends(Provide[ServiceContainer.localdb]),
         cloudflare_service: CloudflareRequestService = Depends(
             Provide[ServiceContainer.cloudflare]
@@ -102,6 +104,32 @@ class ApplicationController:
         encoded_state = base64.b64encode(state_string.encode()).decode()
         return RedirectResponse(url=create_vercel_integration_url(state=encoded_state))
 
+    @router.get("/vercel/callback", description="Vercel Integration Callback")
+    @inject
+    async def vercel_integration_callback(
+        self,
+        query: VercelCallbackDTO = Query(...),
+        user_service: UserSessionService = Depends(
+            Provide[ServiceContainer.user_session]
+        ),
+        vercel_service: VercelRequestService = Depends(
+            Provide[ServiceContainer.vercel]
+        ),
+    ):
+        token, name = base64.b64decode(query.state).decode().split("/")
+        user_id = await user_service.get_user_id(token)
+        user_entity = await UserEntity.get(id=user_id)
+        data = await vercel_service.create_access_code(query.code)
+        user_data = await vercel_service.fetch_current_user(data["access_token"])
+        user_entity.data["vercel"] = {
+            "access_token": data["access_token"],
+            "user_id": user_data["user_id"],
+            "email": user_data["email"],
+            "name": user_data["name"],
+            "username": user_data["username"],
+        }
+        await user_entity.save()
+
     @router.get("/transfer/accept", description="Transfer Accept")
     @limiter.limit("20/minute")
     @inject
@@ -110,7 +138,7 @@ class ApplicationController:
         request: Request,
         background_task: BackgroundTasks,
         code: str = Query(...),
-        user: User = Depends(get_query_user_entity),
+        user: UserEntity = Depends(get_query_user_entity),
         transfer_service: DomainTransferService = Depends(
             Provide[ServiceContainer.transfer]
         ),
